@@ -129,6 +129,8 @@ class Ping(object):
 
     def send(self, current_socket,src,dst,data):
         # Create a new IP packet and set its source and destination IP addresses
+        print("sending from " + src + " to " + dst)
+        print("+++++++++++++++++++++++++++++")
         ip = ImpactPacket.IP()
         ip.set_ip_src(src)
         ip.set_ip_dst(dst)
@@ -182,13 +184,14 @@ class Ping(object):
         if ip_header["ttl"]== 64:
             print("echo reply comes from "+ip)
             print("_______________________")
+            IP1, IP2 = findTwoRandomIP()
+            time.sleep(2)
+            self.send(current_socket, IP1, IP2, data)
+
         if ip_header["ttl"]== 225:
             print("echo request comes from "+ip)
             print("_______________________")
-        if ip_header["ttl"] == 64:
-            IP1 , IP2 = findTwoRandomIP()
-            time.sleep(2)
-            self.send(current_socket,IP1,IP2,data)
+
 
 
     def handle_input(self,current_socket):
@@ -205,7 +208,6 @@ class Ping(object):
             data = commands[2]
             payload = file_name + "\n" + "1" + "\n" + data
             IP1 , IP2 = findTwoRandomIP()
-            print("sending from "+IP1+" to "+IP2+" with payload : \n"+payload+"\n++++++++++++++++++++\n")
             self.send(current_socket,IP1,IP2,payload)
 
     def server(self):
