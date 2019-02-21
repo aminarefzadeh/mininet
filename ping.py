@@ -14,6 +14,8 @@ import time
 import socket, sys
 from impacket import ImpactPacket
 import select
+import traceback
+
 
 if sys.platform.startswith("win32"):
     # On Windows, the best timer is time.clock()
@@ -22,74 +24,17 @@ else:
     # On most other platforms the best timer is time.time()
     default_timer = time.time
 
-# ICMP parameters
-ICMP_ECHOREPLY = 0  # Echo reply (per RFC792)
-ICMP_ECHO = 8  # Echo request (per RFC792)
+
+
 ICMP_MAX_RECV = 2048  # Max size of incoming buffer
-
-MAX_SLEEP = 1000
-
-
-def is_valid_ip4_address(addr):
-    parts = addr.split(".")
-    if not len(parts) == 4:
-        return False
-    for part in parts:
-        try:
-            number = int(part)
-        except ValueError:
-            return False
-        if number > 255 or number < 0:
-            return False
-    return True
-
-
-def to_ip(addr):
-    if is_valid_ip4_address(addr):
-        return addr
-    return socket.gethostbyname(addr)
-
-
-class Response(object):
-    def __init__(self):
-        self.max_rtt = None
-        self.min_rtt = None
-        self.avg_rtt = None
-        self.packet_lost = None
-        self.ret_code = None
-        self.output = []
-
-        self.packet_size = None
-        self.timeout = None
-        self.source = None
-        self.destination = None
-        self.destination_ip = None
 
 
 class Ping(object):
 
-    # --------------------------------------------------------------------------
-
-    def signal_handler(self, signum, frame):
-        """
-		Handle print_exit via signals
-		"""
-        self.print_exit()
-        msg = "\n(Terminated with signal %d)\n" % (signum)
-
-        if self.quiet_output:
-            self.response.output.append(msg)
-            self.response.ret_code = 0
-        else:
-            print(msg)
-
-        sys.exit(0)
-
-    def setup_signal_handler(self):
-        signal.signal(signal.SIGINT, self.signal_handler)  # Handle Ctrl-C
-        if hasattr(signal, "SIGBREAK"):
-            # Handle Ctrl-Break e.g. under Windows
-            signal.signal(signal.SIGBREAK, self.signal_handler)
+    def __init__(self):
+        self.blacklist = {}
+        self.myFile = {}
+        self.wantedFile = {}  # "fileName" : [chumk1,chunk2,...]
 
     # --------------------------------------------------------------------------
 
@@ -100,37 +45,10 @@ class Ping(object):
 
     # --------------------------------------------------------------------------
 
-    def run(self, count=None, deadline=None):
-        """
-		send and receive pings in a loop. Stop if count or until deadline.
-		"""
-        if not self.quiet_output:
-            self.setup_signal_handler()
-
-        while True:
-            delay = self.do()
-
-            self.seq_number += 1
-            if count and self.seq_number >= count:
-                break
-            if deadline and self.total_time >= deadline:
-                break
-
-            if delay == None:
-                delay = 0
-
-            # Pause for the remainder of the MAX_SLEEP period (if applicable)
-            if (MAX_SLEEP > delay):
-                time.sleep((MAX_SLEEP - delay) / 1000.0)
-
-        self.print_exit()
-        if self.quiet_output:
-            return self.response
-
     def send(self, current_socket,src,dst,data):
         # Create a new IP packet and set its source and destination IP addresses
-        print("sending from " + src + " to " + dst)
-        print("+++++++++++++++++++++++++++++")
+        #print("sending from " + src + " to " + dst)
+        #print("+++++++++++++++++++++++++++++")
         ip = ImpactPacket.IP()
         ip.set_ip_src(src)
         ip.set_ip_dst(dst)
@@ -179,14 +97,60 @@ class Ping(object):
         # XXX: Why not ip = address[0] ???
         return data, packet_size, ip, ip_header, icmp_header
 
+    def build_file(self,filename):
+        # check all piece gatehered and store file on ./myIP/filename and remove from wantedFile and myFile
+        if filename not in self.wantedFile :
+            print("panic: not wanted file")
+            return
+        else:
+            chunks = self.wantedFile[filename]
+            for chunk in chunks:
+                if chunk == None:
+                    print ("file not completed yet")
+                    return
+            else :
+                data = ""
+                for chunk in chunks:
+                    data += chunk
+
+                print(chunks)
+                self.myFile.pop(filename)
+                self.wantedFile.pop(filename)
+                print ("data is : "+data)
+
     def handle_request(self,current_socket):
         data, packet_size, ip, ip_header, icmp_header = self.recieve(current_socket)
         if ip_header["ttl"]== 64:
-            print("echo reply comes from "+ip)
-            print("_______________________")
-            IP1, IP2 = findTwoRandomIP()
-            time.sleep(2)
-            self.send(current_socket, IP1, IP2, data)
+            lines = data.split()
+            if (lines[0]=="return_home"):
+                file_name = lines[1]
+                home_ip = lines[2]
+                if file_name not in self.myFile :
+                    self.blacklist[file_name] = home_ip
+                IP1, IP2 = findTwoRandomIP()
+                time.sleep(2)
+                self.send(current_socket, IP1, IP2, data)
+
+            else:
+                print("echo reply comes from " + ip)
+                print("_______________________")
+                file_name = lines[0]
+                file_part = int(lines[1])
+
+                if(lines[0] in self.blacklist):
+                    #returning to home
+                    time.sleep(2)
+                    srcIP = self.blacklist[file_name]
+                    self.send(current_socket,srcIP,findAnotherIP(srcIP),data)
+                elif lines[0] in self.wantedFile :
+                    index = data.find("\n") +1
+                    index += data[index:].find("\n") +1
+                    self.wantedFile[file_name][file_part] = data[index:]
+                    self.build_file(file_name)
+                else:
+                    IP1, IP2 = findTwoRandomIP()
+                    time.sleep(2)
+                    self.send(current_socket, IP1, IP2, data)
 
         if ip_header["ttl"]== 225:
             print("echo request comes from "+ip)
@@ -196,19 +160,30 @@ class Ping(object):
 
     def handle_input(self,current_socket):
         command = raw_input()
-        print(command)
         commands = command.split()
         if(commands[0]=="return_home"):
-            print("return home")
+            print("return_home")
             file_name = commands[1]
-            dest_name = commands[2]
+            if file_name not in self.myFile:
+                print("it's not your file")
+                return
+            payload = "return_home\n"+file_name+"\n"+IPrange+str(myIndex)
+            IP1, IP2 = findTwoRandomIP()
+            self.wantedFile[file_name]=[None for i in range(0,self.myFile[file_name])]
+            self.send(current_socket, IP1, IP2, payload)
+
 
         if(commands[0]=="add"):
             file_name = commands[1]
             data = commands[2]
-            payload = file_name + "\n" + "1" + "\n" + data
-            IP1 , IP2 = findTwoRandomIP()
-            self.send(current_socket,IP1,IP2,payload)
+            self.myFile[file_name] = (len(data)-1)/8 +1
+            chunks = [data[i:i + 8] for i in range(0, len(data), 8)]
+            for i in range(0,len(chunks)):
+                payload = file_name + "\n" + str(i) + "\n" + chunks[i]
+                IP1 , IP2 = findTwoRandomIP()
+                time.sleep(0.5)
+                self.send(current_socket,IP1,IP2,payload)
+
 
     def server(self):
         try:
@@ -249,8 +224,10 @@ class Ping(object):
                         poller.unregister(fd_to_object[fd])
                     elif flag & select.POLLERR:
                         poller.unregister(fd_to_object[fd])
-            except:
+            except Exception as e:
                 print("some thing happend")
+                print (e.message)
+                print (traceback.format_exc())
                 current_socket.close()
                 return
 
@@ -281,6 +258,14 @@ def findTwoRandomIP():
             selected2 += 1
 
     return (IPrange+str(selected1),IPrange+str(selected2))
+
+def findAnotherIP(srcIP):
+    for i in range(1,hostNum+1):
+        if(i!=myIndex):
+            IP = IPrange+str(i)
+            if(IP != srcIP):
+                return IP
+
 
 
 p = Ping()
