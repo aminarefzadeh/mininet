@@ -1,0 +1,7 @@
+
+for xterm use 
+ssh -X ...
+
+and in mininet use
+sudo mn -x
+
