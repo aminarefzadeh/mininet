@@ -148,7 +148,6 @@ class Ping(object):
         try:
             current_socket.sendto(ip.get_packet(), (dst, 1))  # Port number is irrelevant for ICMP
         except socket.error as e:
-            self.response.output.append("General failure (%s)" % (e.args[1]))
             return
 
     def recieve(self, current_socket):
@@ -179,10 +178,18 @@ class Ping(object):
         return data, packet_size, ip, ip_header, icmp_header
 
     def handle_request(self,current_socket):
-        packet_data, address = current_socket.recvfrom(ICMP_MAX_RECV)
-        print("request come")
-        print(packet_data)
-        print(address)
+        data, packet_size, ip, ip_header, icmp_header = self.recieve(current_socket)
+        if ip_header["ttl"]== 64:
+            print("echo reply comes from "+ip)
+            print("_______________________")
+        if ip_header["ttl"]== 225:
+            print("echo request comes from "+ip)
+            print("_______________________")
+        if ip_header["ttl"] == 64:
+            IP1 , IP2 = findTwoRandomIP()
+            time.sleep(2)
+            self.send(current_socket,IP1,IP2,data)
+
 
     def handle_input(self,current_socket):
         command = raw_input()
@@ -198,7 +205,7 @@ class Ping(object):
             data = commands[2]
             payload = file_name + "\n" + "1" + "\n" + data
             IP1 , IP2 = findTwoRandomIP()
-            print("sending from "+IP1+" to "+IP2+" with payload : \n"+payload+"\n_____________\n")
+            print("sending from "+IP1+" to "+IP2+" with payload : \n"+payload+"\n++++++++++++++++++++\n")
             self.send(current_socket,IP1,IP2,payload)
 
     def server(self):
@@ -251,14 +258,9 @@ class Ping(object):
 import sys
 from random import random
 
-# IPrange = sys.argv[1]
-# myIndex = int(sys.argv[2])
-# hostNum = int(sys.argv[3])
-
-
-IPrange = "10.0.0."
-myIndex = 1
-hostNum = 3
+IPrange = sys.argv[1]
+myIndex = int(sys.argv[2])
+hostNum = int(sys.argv[3])
 
 
 def findTwoRandomIP():

@@ -5,3 +5,6 @@ ssh -X ...
 and in mininet use
 sudo mn -x
 
+ttl=225 --> echo request
+
+ip_header[ttl]=64 --> echo reply -->> we should resume process if this happens
