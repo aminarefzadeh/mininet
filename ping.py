@@ -384,7 +384,28 @@ def ping(source, hostname, timeout=1000, count=3, packet_size=55, *args, **kwarg
 	p = Ping(source, hostname, timeout, packet_size, *args, **kwargs)
 	return p.run(count)
 
-ping("10.0.0.1", "10.0.0.2")    #put your IP and destination IP address as the ping function argument and run the code. you can ping
-												 #the destination with your own code!!!
 
 
+import sys
+from random import random
+
+myip = sys.argv[1]+sys.argv[2]
+hostNum = int(sys.argv[3])
+myIndex = int(sys.argv[2])
+
+def findRandomSource():
+	selected = int(random()*(hostNum-1))+1
+	if selected>= myIndex:
+		selected+=1
+	return sys.argv[1]+str(selected)
+
+
+# commands --> return_home name_of_file
+# commands --> add name_of_file
+
+# making appropriate data and reading and chunking files and put data on body
+# reciving data countinuesly and with select reading from stdin to for commands. after recieving ping to random location
+
+command = raw_input()
+#if command == "return_home":
+#ping(findRandomSource(),findRandomSource())

@@ -10,17 +10,15 @@ from mininet.log import setLogLevel
 class MyTopo( Topo ):
     "Single switch connected to n hosts."
     def build( self , n , **opt):
-	switches = []
-	for i in range(0,n):
-		switches.append(self.addSwitch("s"+str(i)))
-	host1 = self.addHost('h1')
-	host2 = self.addHost('h2')
-	
-	for i in range(0,n-1):
-		self.addLink( switches[i], switches[i+1], **opt)
-
-	self.addLink( host1, switches[0], **opt)
-	self.addLink( host2, switches[-1], **opt)
+		switches = []
+		for i in range(0,n):
+			switches.append(self.addSwitch("s"+str(i)))
+		host1 = self.addHost('h1')
+		host2 = self.addHost('h2')
+		for i in range(0,n-1):
+			self.addLink( switches[i], switches[i+1], **opt)
+		self.addLink( host1, switches[0], **opt)
+		self.addLink( host2, switches[-1], **opt)
 
 
 topos = { 	'topo1_1': ( lambda: MyTopo(2,**{"delay":"20ms"}) ),
