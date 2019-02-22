@@ -116,7 +116,10 @@ class Ping(object):
                 print(chunks)
                 self.myFile.pop(filename)
                 self.wantedFile.pop(filename)
-                print ("data is : "+data)
+                print ("data is : " + data)
+                os.mkdir()
+                with open(IPrange + str(myIndex) + "_" + filename, "w") as recovered_file:
+                    recovered_file.write(data)
 
     def handle_request(self,current_socket):
         data, packet_size, ip, ip_header, icmp_header = self.recieve(current_socket)
@@ -175,7 +178,16 @@ class Ping(object):
 
         if(commands[0]=="add"):
             file_name = commands[1]
-            data = commands[2]
+            # data = commands[2]
+            try:
+                file_data = open(file_name, "r")
+            except:
+                print("file not exist!")
+                return
+
+            data = file_data.read()
+            file_data.close()
+
             self.myFile[file_name] = (len(data)-1)/8 +1
             chunks = [data[i:i + 8] for i in range(0, len(data), 8)]
             for i in range(0,len(chunks)):
@@ -183,7 +195,7 @@ class Ping(object):
                 IP1 , IP2 = findTwoRandomIP()
                 time.sleep(0.5)
                 self.send(current_socket,IP1,IP2,payload)
-
+            print("file sended successfully")
 
     def server(self):
         try:
@@ -204,9 +216,8 @@ class Ping(object):
                 raise etype, evalue, etb
             raise  # raise the original error
 
-        fd_to_object = {}
-        fd_to_object[current_socket.fileno()]= current_socket
-        fd_to_object[sys.__stdout__.fileno()]= sys.__stdout__
+        fd_to_object = {current_socket.fileno(): current_socket, sys.__stdout__.fileno(): sys.__stdout__}
+
         poller = select.poll()
         poller.register(current_socket, select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
         poller.register(sys.__stdout__, select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
