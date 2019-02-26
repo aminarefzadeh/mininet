@@ -47,7 +47,7 @@ class Ping(object):
 
     # --------------------------------------------------------------------------
 
-    def send(self, current_socket,src,dst,data):
+    def send(self, current_socket,src,dst,data,chunk_id=0):
         # Create a new IP packet and set its source and destination IP addresses
         #print("sending from " + src + " to " + dst)
         #print("+++++++++++++++++++++++++++++")
@@ -62,7 +62,7 @@ class Ping(object):
         icmp.contains(ImpactPacket.Data(data))
         ip.contains(icmp)
         # give the ICMP packet some ID
-        icmp.set_icmp_id(0x03)
+        icmp.set_icmp_id(chunk_id)
         # set the ICMP packet checksum
         icmp.set_icmp_cksum(0)
         icmp.auto_checksum = 1
@@ -125,6 +125,7 @@ class Ping(object):
     def handle_request(self,current_socket):
         data, packet_size, ip, ip_header, icmp_header = self.recieve(current_socket)
         if not icmp_header == 0 and icmp_header["type"]==ICMP_ECHOREPLY:
+            chunk_id = icmp_header["packet_id"]
             lines = data.split()
             if (lines[0]=="return_home"):
                 file_name = lines[1]
@@ -133,28 +134,27 @@ class Ping(object):
                     self.blacklist[file_name] = home_ip
                 IP1, IP2 = findTwoRandomIP()
                 time.sleep(2)
-                self.send(current_socket, IP1, IP2, data)
+                self.send(current_socket, IP1, IP2, data,chunk_id)
 
             else:
                 print("echo reply comes from " + ip)
                 print("_______________________")
                 file_name = lines[0]
-                file_part = int(lines[1])
 
                 if(lines[0] in self.blacklist):
                     #returning to home
                     time.sleep(2)
                     srcIP = self.blacklist[file_name]
-                    self.send(current_socket,srcIP,findAnotherIP(srcIP),data)
+                    self.send(current_socket,srcIP,findAnotherIP(srcIP),data,chunk_id)
                 elif lines[0] in self.wantedFile :
                     index = data.find("\n") +1
-                    index += data[index:].find("\n") +1
-                    self.wantedFile[file_name][file_part] = data[index:]
+                    #index += data[index:].find("\n") +1
+                    self.wantedFile[file_name][chunk_id] = data[index:]
                     self.build_file(file_name)
                 else:
                     IP1, IP2 = findTwoRandomIP()
                     time.sleep(2)
-                    self.send(current_socket, IP1, IP2, data)
+                    self.send(current_socket, IP1, IP2, data,chunk_id)
 
 
 
@@ -171,7 +171,7 @@ class Ping(object):
             payload = "return_home\n"+file_name+"\n"+IPrange+str(myIndex)
             IP1, IP2 = findTwoRandomIP()
             self.wantedFile[file_name]=[None for i in range(0,self.myFile[file_name])]
-            self.send(current_socket, IP1, IP2, payload)
+            self.send(current_socket, IP1, IP2, payload, 0x00)
 
 
         if(commands[0]=="add"):
@@ -189,10 +189,10 @@ class Ping(object):
             self.myFile[file_name] = (len(data)-1)/8 +1
             chunks = [data[i:i + 8] for i in range(0, len(data), 8)]
             for i in range(0,len(chunks)):
-                payload = file_name + "\n" + str(i) + "\n" + chunks[i]
+                payload = file_name + "\n" + chunks[i]
                 IP1 , IP2 = findTwoRandomIP()
                 time.sleep(0.5)
-                self.send(current_socket,IP1,IP2,payload)
+                self.send(current_socket,IP1,IP2,payload,i)
             print("file sended successfully")
 
     def server(self):
@@ -246,9 +246,11 @@ class Ping(object):
 import sys
 from random import random
 
-IPrange = sys.argv[1]
-myIndex = int(sys.argv[2])
-hostNum = int(sys.argv[3])
+# we set this
+IPrange = "10.0.0."
+
+myIndex = int(sys.argv[1])
+hostNum = int(sys.argv[2])
 
 
 def findTwoRandomIP():

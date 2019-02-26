@@ -18,7 +18,7 @@ class MyTopo( Topo ):
     def build( self ,n):
         switch = self.addSwitch( 's1' )
         for i in range(0,n):
-            host = self.addHost('h'+str(i),)
+            host = self.addHost('h'+str(i+1),)
             self.addLink( host, switch)
 
 
@@ -28,7 +28,7 @@ def perfTest(n):
     net = Mininet( topo=topo, link=TCLink )
     net.start()
     for i in range(0,n):
-        host = net.get( 'h'+str(i) )
+        host = net.get( 'h'+str(i+1) )
         host.setIP('10.0.0.'+str(i+1))
     cli = CLI(net)
     net.stop()
