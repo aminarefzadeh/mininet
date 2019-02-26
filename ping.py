@@ -2,7 +2,7 @@
 	A pure python ping implementation using raw sockets.
 
 	Note that ICMP messages can only be send from processes running as root
-	
+
 """
 
 import os
@@ -17,6 +17,7 @@ import select
 import traceback
 
 
+
 if sys.platform.startswith("win32"):
     # On Windows, the best timer is time.clock()
     default_timer = time.clock
@@ -25,7 +26,8 @@ else:
     default_timer = time.time
 
 
-
+ICMP_ECHOREPLY = 0 # Echo reply (per RFC792)
+ICMP_ECHO = 8 # Echo request (per RFC792)
 ICMP_MAX_RECV = 2048  # Max size of incoming buffer
 
 
@@ -117,13 +119,12 @@ class Ping(object):
                 self.myFile.pop(filename)
                 self.wantedFile.pop(filename)
                 print ("data is : " + data)
-                os.mkdir()
                 with open(IPrange + str(myIndex) + "_" + filename, "w") as recovered_file:
                     recovered_file.write(data)
 
     def handle_request(self,current_socket):
         data, packet_size, ip, ip_header, icmp_header = self.recieve(current_socket)
-        if ip_header["ttl"]== 64:
+        if not icmp_header == 0 and icmp_header["type"]==ICMP_ECHOREPLY:
             lines = data.split()
             if (lines[0]=="return_home"):
                 file_name = lines[1]
@@ -155,9 +156,6 @@ class Ping(object):
                     time.sleep(2)
                     self.send(current_socket, IP1, IP2, data)
 
-        if ip_header["ttl"]== 225:
-            print("echo request comes from "+ip)
-            print("_______________________")
 
 
 
@@ -216,11 +214,11 @@ class Ping(object):
                 raise etype, evalue, etb
             raise  # raise the original error
 
-        fd_to_object = {current_socket.fileno(): current_socket, sys.__stdout__.fileno(): sys.__stdout__}
+        fd_to_object = {current_socket.fileno(): current_socket, sys.__stdin__.fileno(): sys.__stdin__}
 
         poller = select.poll()
         poller.register(current_socket, select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
-        poller.register(sys.__stdout__, select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
+        poller.register(sys.__stdin__, select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
         while True:
             try:
                 events = poller.poll(0)
@@ -228,7 +226,7 @@ class Ping(object):
                     if flag & (select.POLLIN | select.POLLPRI):
                         if (fd_to_object[fd] == current_socket):
                             self.handle_request(current_socket)
-                        else:
+                        elif (fd_to_object[fd] == sys.__stdin__ ):
                             self.handle_input(current_socket)
 
                     elif flag & select.POLLHUP:
